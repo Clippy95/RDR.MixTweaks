@@ -37,9 +37,8 @@ public:
 				auto pattern = hook::pattern("F3 0F 5C C1 41 0F 2F C1 72 ? 0F 28 D7");
 				if (!pattern.empty()) {
 					Memory::VP::Nop(pattern.get_first<void>(0), 0x2C);
-					printf("RDR.MouseFix pattern scan success start nop: %p jump: %p \n", pattern.get_first<void>(0), 0x6969);
 				}
-				CIniReader ini;
+				
 				pattern = hook::pattern("F3 0F 59 3D ? ? ? ? F3 0F 10 0D");
 
 				if (!pattern.empty())
@@ -52,8 +51,6 @@ public:
 				pattern = hook::pattern("48 8B 05 ? ? ? ? F3 0F 10 05 ? ? ? ? 48 8B 48 ? F3 0F 10 89 ? ? ? ? E8 ? ? ? ? 8B 05 ? ? ? ? 0F 28 F0 F3 0F 59 35 ? ? ? ? F7 D8 66 0F 6E F8");
 				if (!pattern.empty()) {
 					uint32_t camera_ptr_offset = *pattern.get_first<uint32_t>(3);
-
-					printf("camera offset %p\n", camera_ptr_offset);
 
 					camera_pointer = (uintptr_t)pattern.get_first<uintptr_t>(7);
 					camera_pointer += camera_ptr_offset;
