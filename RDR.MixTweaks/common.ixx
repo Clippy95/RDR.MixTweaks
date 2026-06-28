@@ -976,66 +976,63 @@ public:
     }
 };
 
-//export std::optional<uintptr_t> resolve_displacement(auto ip)
-//{
-//    ZydisDecoder decoder;
-//#if defined(_M_X64) || defined(__x86_64__)
-//    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
-//#else
-//    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
-//#endif
-//
-//    ZydisDecodedInstruction instruction;
-//    ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
-//
-//    ZyanStatus status = ZydisDecoderDecodeFull(
-//        &decoder,
-//        (void*)ip,
-//        ZYDIS_MAX_INSTRUCTION_LENGTH,
-//        &instruction,
-//        operands
-//    );
-//
-//    if (!ZYAN_SUCCESS(status))
-//    {
-//        return std::nullopt;
-//    }
-//
-//    for (uint32_t i = 0; i < instruction.operand_count_visible; ++i)
-//    {
-//        const auto& operand = operands[i];
-//
-//        if (operand.type == ZYDIS_OPERAND_TYPE_MEMORY)
-//        {
-//            if (operand.mem.disp.has_displacement)
-//            {
-//#if defined(_M_X64) || defined(__x86_64__)
-//                if (operand.mem.is_rip_relative)
-//                {
-//                    return (uintptr_t)ip + instruction.length + operand.mem.disp.value;
-//                }
-//#else
-//                return static_cast<uintptr_t>(operand.mem.disp.value);
-//#endif
-//            }
-//        }
-//        else if (operand.type == ZYDIS_OPERAND_TYPE_IMMEDIATE)
-//        {
-//            if (operand.imm.is_relative)
-//            {
-//                return (uintptr_t)ip + instruction.length + ZyanISize(operand.imm.value.s);
-//            }
-//        }
-//    }
-//
-//    if (instruction.attributes & ZYDIS_ATTRIB_IS_RELATIVE && instruction.raw.disp.size > 0)
-//    {
-//        return (uintptr_t)ip + instruction.length + ZyanISize(instruction.raw.disp.value);
-//    }
-//
-//    return std::nullopt;
-//}
-//
+template <class T>
+static uintptr_t to_uintptr(T value)
+{
+    using U = std::remove_cvref_t<T>;
+
+    if constexpr (std::is_pointer_v<U>)
+        return reinterpret_cast<uintptr_t>(value);
+    else
+        return static_cast<uintptr_t>(value);
+}
+
+export std::optional<uintptr_t> resolve_displacement(auto ip)
+{
+    const uintptr_t runtime_ip = to_uintptr(ip);
+
+    ZydisDecoder decoder{};
+
+#if defined(_M_X64) || defined(__x86_64__)
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
+#else
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
+#endif
+
+    ZydisDecodedInstruction instruction{};
+    ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT]{};
+
+    const ZyanStatus status = ZydisDecoderDecodeFull(
+        &decoder,
+        reinterpret_cast<const void*>(runtime_ip),
+        ZYDIS_MAX_INSTRUCTION_LENGTH,
+        &instruction,
+        operands
+    );
+
+    if (!ZYAN_SUCCESS(status))
+        return std::nullopt;
+
+    for (uint32_t i = 0; i < instruction.operand_count_visible; ++i)
+    {
+        const auto& operand = operands[i];
+
+        ZyanU64 absolute_address = 0;
+
+        if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(
+            &instruction,
+            &operand,
+            static_cast<ZyanU64>(runtime_ip),
+            &absolute_address
+        )))
+        {
+            return static_cast<uintptr_t>(absolute_address);
+        }
+    }
+
+    return std::nullopt;
+}
+
 //export std::optional<uintptr_t> resolve_next_displacement(auto ip)
 //{
 //    ZydisDecoder decoder;
@@ -1114,6 +1111,28 @@ public:
 //
 //    return std::nullopt;
 //}
+
+export template <typename T>
+bool pattern_to_ptr(const char* signature, T*& out)
+{
+    auto pattern = hook::pattern(signature);
+
+    if (pattern.empty())
+        return false;
+
+    auto displacement = resolve_displacement(pattern.get_first());
+
+    if (!displacement.has_value())
+        return false;
+
+    auto ptr_storage = reinterpret_cast<T**>(displacement.value());
+
+    if (!ptr_storage || !*ptr_storage)
+        return false;
+
+    out = *ptr_storage;
+    return true;
+}
 
 export template<typename T>
 class GameRef
