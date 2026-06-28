@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="external">
+      <UniqueIdentifier>{088c6a5f-b507-4066-9a81-6d133234219e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external\safetyhook">
+      <UniqueIdentifier>{be679866-1349-4b70-8c24-5fcaa6ec2100}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external\ModUtils">
+      <UniqueIdentifier>{c4d30266-a553-4cbe-873d-c4894eb6d2a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external\mini">
+      <UniqueIdentifier>{4b9ce1b1-36bc-40b1-8bb6-71afcee58e29}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external\safetyhook\Zydis.h">
+      <Filter>external\safetyhook</Filter>
+    </ClInclude>
+    <ClInclude Include="external\safetyhook\safetyhook.hpp">
+      <Filter>external\safetyhook</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\HookEach.hpp">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\HookInit.hpp">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\LateStaticInit.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\MemoryMgr.GTA.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\MemoryMgr.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\ModuleList.hpp">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\Patterns.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\ScopedUnprotect.hpp">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\Trampoline.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ModUtils\DelimStringReader.h">
+      <Filter>external\ModUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="external\mini\ini.h">
+      <Filter>external\mini</Filter>
+    </ClInclude>
+    <ClInclude Include="external\IniReader.h">
+      <Filter>external</Filter>
+    </ClInclude>
+    <ClInclude Include="common.hxx">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="maths.hxx">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="external\safetyhook\Zydis.c">
+      <Filter>external\safetyhook</Filter>
+    </ClCompile>
+    <ClCompile Include="external\safetyhook\safetyhook.cpp">
+      <Filter>external\safetyhook</Filter>
+    </ClCompile>
+    <ClCompile Include="external\ModUtils\Patterns.cpp">
+      <Filter>external\ModUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="common.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mousefix.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="comvars.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shaders.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="external\ModUtils\LICENSE">
+      <Filter>external\ModUtils</Filter>
+    </None>
+    <None Include="external\ModUtils\README.md">
+      <Filter>external\ModUtils</Filter>
+    </None>
+  </ItemGroup>
+</Project>
