@@ -92,11 +92,31 @@ public:
 };
 VALIDATE_SIZE(rdrPostFX, 0x1000);
 
+export namespace UAL
+{
+	bool (WINAPI* GetOverloadPathW)(wchar_t* out, size_t out_size) = nullptr;
+	bool (WINAPI* AddVirtualFileForOverloadW)(const wchar_t* virtualPath, const uint8_t* data, size_t size, int priority) = nullptr;
+}
+
 class Common
 {
 public:
 	Common()
 	{
+		// from fusafix
+		ModuleList dlls;
+		dlls.Enumerate(ModuleList::SearchLocation::LocalOnly);
+		for (auto& e : dlls.m_moduleList)
+		{
+			auto m = std::get<HMODULE>(e);
+			if (IsModuleUAL(m))
+			{
+				UAL::GetOverloadPathW = (decltype(UAL::GetOverloadPathW))GetProcAddress(m, "GetOverloadPathW");
+				UAL::AddVirtualFileForOverloadW = (decltype(UAL::AddVirtualFileForOverloadW))GetProcAddress(m, "AddVirtualFileForOverloadW");
+				break;
+			}
+		}
+
 		auto pattern = hook::pattern("48 8B 0D ? ? ? ? 48 89 91");
 		if (!pattern.empty())
 		{
