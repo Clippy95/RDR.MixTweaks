@@ -1299,3 +1299,34 @@ public:
 
     explicit operator bool() const { return static_cast<bool>(get()); }
 };
+
+#include <cassert>
+#include <utility>
+
+export template <typename Fn>
+class GamePatternFn
+{
+public:
+    GamePatternFn(const char* signature, int get_first_arg = 0)
+    {
+        auto pattern = hook::pattern(signature);
+
+        if (!pattern.empty())
+            m_fn = reinterpret_cast<Fn>(pattern.get_first(get_first_arg));
+    }
+
+    template <typename... Args>
+    decltype(auto) operator()(Args&&... args) const
+    {
+        assert(m_fn);
+        return m_fn(std::forward<Args>(args)...);
+    }
+
+    explicit operator bool() const
+    {
+        return m_fn != nullptr;
+    }
+
+private:
+    Fn m_fn = nullptr;
+};

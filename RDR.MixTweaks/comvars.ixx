@@ -38,6 +38,20 @@ static_assert(sizeof(GameString) == 0x20);
 export namespace rage
 {
 
+	GAME_FN(
+		atPartialStringHash,
+		"75 ? 33 C0 C3 ? ? ? 75 ? 0F B6 41",
+		__int64,
+		(const char* string, int starter),
+		-6
+	);
+
+	__int64 atStringHash(const char* string, int starter = 0)
+	{
+		auto result = atPartialStringHash(string, starter);
+		return 32769 * ((9 * result) ^ ((unsigned int)(9 * result) >> 11));
+	}
+
 	typedef uintptr_t grcTexture;
 
 	namespace grPostFX

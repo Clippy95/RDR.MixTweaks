@@ -16,3 +16,8 @@
 #include <d3d9.h>
 #include "maths.hxx"
 #include <MemoryMgr.h>
+#define GAME_FN(name, signature, ret, args, get_first_arg) \
+    inline GamePatternFn<ret(__cdecl*) args> name{ signature, get_first_arg }
+
+#define GAME_FN_DEFAULT(name, signature, ret, args) \
+    inline GamePatternFn<ret(__cdecl*) args> name{ signature, 0 }
