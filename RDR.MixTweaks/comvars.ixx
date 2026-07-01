@@ -1,6 +1,7 @@
 module;
 
 #include "common.hxx"
+#include <cstddef>
 
 export module comvars;
 
@@ -10,6 +11,29 @@ import common;
 
 
 class rdrPostFX;
+
+uintptr_t game_free = NULL;
+
+export class GameString
+{
+public:
+	char text[16]{};
+	size_t size{};
+	size_t capacity{15};
+
+	void Free()
+	{
+		if (capacity < 16)
+			return;
+
+		fastcall_call<void>(reinterpret_cast<uintptr_t>(RdrAddress(game_free)), *reinterpret_cast<void**>(this));
+	}
+};
+
+static_assert(offsetof(GameString, text) == 0x00);
+static_assert(offsetof(GameString, size) == 0x10);
+static_assert(offsetof(GameString, capacity) == 0x18);
+static_assert(sizeof(GameString) == 0x20);
 
 export namespace rage
 {
@@ -137,5 +161,9 @@ public:
 		if(!pattern.empty())
 		rage::grPostFX::BuildHudlessRT = reinterpret_cast<rage::grPostFX::BuildHudlessRTFn>(
 			pattern.get_first(-0xA));
+
+		pattern = hook::pattern("53 48 83 EC ? 48 8B D9 E8 ? ? ? ? 48 8B D3");
+		if (!pattern.empty())
+			game_free = (uintptr_t)pattern.get_first(-5);
 	}
 }Common;

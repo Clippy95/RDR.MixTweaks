@@ -129,6 +129,37 @@ public:
     //}
 };
 
+export template<typename Ret, typename... Args>
+inline Ret cdecl_call(uintptr_t addr, Args... args)
+{
+    return reinterpret_cast<Ret(__cdecl*)(Args...)>(addr)(args...);
+}
+
+export template<typename Ret, typename... Args>
+inline Ret stdcall_call(uintptr_t addr, Args... args)
+{
+    return reinterpret_cast<Ret(__stdcall*)(Args...)>(addr)(args...);
+}
+
+export template<typename Ret, typename... Args>
+inline Ret fastcall_call(uintptr_t addr, Args... args)
+{
+    return reinterpret_cast<Ret(__fastcall*)(Args...)>(addr)(args...);
+}
+
+export template<typename Ret, typename... Args>
+inline Ret thiscall_call(uintptr_t addr, Args... args)
+{
+    return reinterpret_cast<Ret(__thiscall*)(Args...)>(addr)(args...);
+}
+
+export constexpr uintptr_t rdr_exe_base = 0x140000000;
+
+export void* RdrAddress(uintptr_t address)
+{
+    return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)) + (address - rdr_exe_base));
+}
+
 export template<class T = std::filesystem::path>
 T GetModulePath(HMODULE hModule)
 {
@@ -1031,6 +1062,20 @@ export std::optional<uintptr_t> resolve_displacement(auto ip)
     }
 
     return std::nullopt;
+}
+
+export bool resolve_pattern_displacement(const char* pattern_string, uintptr_t& value, int get_first_offset = 0)
+{
+    auto pattern = hook::pattern(pattern_string);
+    if (pattern.empty())
+        return false;
+
+    auto displacement = resolve_displacement(pattern.get_first(get_first_offset));
+    if (!displacement.has_value())
+        return false;
+
+    value = displacement.value();
+    return true;
 }
 
 //export std::optional<uintptr_t> resolve_next_displacement(auto ip)
