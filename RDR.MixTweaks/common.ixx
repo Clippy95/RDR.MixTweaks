@@ -60,61 +60,61 @@ public:
         static Event<> InitEvent;
         return InitEvent;
     }
-    static Event<>& onInitEventAsync()
-    {
-        static Event<> InitEventAsync;
-        return InitEventAsync;
-    }
+    //static Event<>& onInitEventAsync()
+    //{
+    //    static Event<> InitEventAsync;
+    //    return InitEventAsync;
+    //}
     static Event<>& onShutdownEvent()
     {
         static Event<> ShutdownEvent;
         return ShutdownEvent;
     }
-    static Event<>& onGameInitEvent()
-    {
-        static Event<> GameInitEvent;
-        return GameInitEvent;
-    }
-    static Event<>& onGameProcessEvent()
-    {
-        static Event<> GameProcessEvent;
-        return GameProcessEvent;
-    }
-    static Event<>& onMenuDrawingEvent()
-    {
-        static Event<> MenuDrawingEvent;
-        return MenuDrawingEvent;
-    }
-    static Event<>& onMenuEnterEvent()
-    {
-        static Event<> MenuEnterEvent;
-        return MenuEnterEvent;
-    }
-    static Event<>& onMenuExitEvent()
-    {
-        static Event<> MenuExitEvent;
-        return MenuExitEvent;
-    }
-    static Event<bool>& onActivateApp()
-    {
-        static Event<bool> ActivateApp;
-        return ActivateApp;
-    }
-    static Event<>& onBeforeReset()
-    {
-        static Event<> BeforeReset;
-        return BeforeReset;
-    }
-    static Event<>& onEndScene()
-    {
-        static Event<> EndScene;
-        return EndScene;
-    }
-    static Event<>& onReadGameConfig()
-    {
-        static Event<> ReadGameConfig;
-        return ReadGameConfig;
-    }
+    //static Event<>& onGameInitEvent()
+    //{
+    //    static Event<> GameInitEvent;
+    //    return GameInitEvent;
+    //}
+    //static Event<>& onGameProcessEvent()
+    //{
+    //    static Event<> GameProcessEvent;
+    //    return GameProcessEvent;
+    //}
+    //static Event<>& onMenuDrawingEvent()
+    //{
+    //    static Event<> MenuDrawingEvent;
+    //    return MenuDrawingEvent;
+    //}
+    //static Event<>& onMenuEnterEvent()
+    //{
+    //    static Event<> MenuEnterEvent;
+    //    return MenuEnterEvent;
+    //}
+    //static Event<>& onMenuExitEvent()
+    //{
+    //    static Event<> MenuExitEvent;
+    //    return MenuExitEvent;
+    //}
+    //static Event<bool>& onActivateApp()
+    //{
+    //    static Event<bool> ActivateApp;
+    //    return ActivateApp;
+    //}
+    //static Event<>& onBeforeReset()
+    //{
+    //    static Event<> BeforeReset;
+    //    return BeforeReset;
+    //}
+    //static Event<>& onEndScene()
+    //{
+    //    static Event<> EndScene;
+    //    return EndScene;
+    //}
+    //static Event<>& onReadGameConfig()
+    //{
+    //    static Event<> ReadGameConfig;
+    //    return ReadGameConfig;
+    //}
     //static Event<>& onAfterReset() {
     //    static Event<> AfterReset;
     //    return AfterReset;

@@ -102,6 +102,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>if defined RDR1_DIR (
+    if not defined GITHUB_ACTIONS (
+        xcopy /Y /I "$(TargetPath)" "$(RDR1_DIR)\plugins" &gt;nul 2&gt;nul
+    )
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -121,6 +128,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>if defined RDR1_DIR (
+    if not defined GITHUB_ACTIONS (
+        xcopy /Y /I "$(TargetPath)" "$(RDR1_DIR)\plugins" &gt;nul 2&gt;nul
+    )
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -138,6 +152,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>if defined RDR1_DIR (
+    if not defined GITHUB_ACTIONS (
+        xcopy /Y /I "$(TargetPath)" "$(RDR1_DIR)\plugins" &gt;nul 2&gt;nul
+    )
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -157,6 +178,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>if defined RDR1_DIR (
+    if not defined GITHUB_ACTIONS (
+        xcopy /Y /I "$(TargetPath)" "$(RDR1_DIR)\plugins" &gt;nul 2&gt;nul
+    )
+)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="common.hxx" />
@@ -192,6 +220,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="rpf.ixx" />
     <ClCompile Include="shaders.ixx" />
   </ItemGroup>
   <ItemGroup>
