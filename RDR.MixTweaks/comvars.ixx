@@ -26,7 +26,7 @@ public:
 		if (capacity < 16)
 			return;
 
-		fastcall_call<void>(reinterpret_cast<uintptr_t>(game_free), *reinterpret_cast<void**>(this));
+		fastcall_call<void>(game_free, *reinterpret_cast<void**>(this));
 	}
 };
 
