@@ -13,6 +13,10 @@ private:
     std::filesystem::path m_szFileName;
     mINI::INIStructure m_ini;
 
+    static void ModuleAnchor()
+    {
+    }
+
 public:
     CIniReader()
     {
@@ -88,12 +92,24 @@ public:
 
     void SetIniPath(std::filesystem::path szFileName)
     {
-        static const auto lpModuleName = 1;
-        WCHAR buffer[MAX_PATH];
-        HMODULE hm = NULL;
-        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&lpModuleName, &hm);
-        GetModuleFileNameW(hm, buffer, ARRAYSIZE(buffer));
-        std::filesystem::path modulePath(buffer);
+        HMODULE hm = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&CIniReader::ModuleAnchor, &hm);
+
+        std::wstring modulePathString(MAX_PATH, L'\0');
+        DWORD charsReturned = 0;
+        for (;;)
+        {
+            charsReturned = GetModuleFileNameW(hm, modulePathString.data(), (DWORD)modulePathString.size());
+            if (charsReturned == 0)
+                break;
+            if (charsReturned < modulePathString.size())
+                break;
+
+            modulePathString.resize(modulePathString.size() * 2);
+        }
+
+        modulePathString.resize(charsReturned);
+        std::filesystem::path modulePath(modulePathString);
 
         if (szFileName.is_absolute())
         {
