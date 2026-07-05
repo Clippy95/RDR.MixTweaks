@@ -42,7 +42,7 @@ extern "C"
     {
         std::call_once(CallbackHandler::flag, []()
             {
-                CallbackHandler::RegisterCallback(Init, hook::pattern("E8 ? ? ? ? 4D 85 F6 74 ? 49 8B D6"));
+                CallbackHandler::RegisterCallbackAtGetSystemTimeAsFileTime(Init, hook::pattern("E8 ? ? ? ? 4D 85 F6 74 ? 49 8B D6"));
             });
     }
 }
