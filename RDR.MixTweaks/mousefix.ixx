@@ -125,7 +125,7 @@ public:
 
 
 
-				if (ini.ReadInteger("CONTROLS", "EnableMouseSideHooks", 1) != 0)
+				if (ini.ReadInteger("CONTROLS", "EnableMouseSideHooks", 0) != 0)
 				{
 					resolve_pattern_displacement("48 8B 3D ? ? ? ? 44 38 A7 ? ? ? ? 74", game_action_input_global);
 
