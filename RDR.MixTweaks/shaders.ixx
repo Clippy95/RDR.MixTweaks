@@ -34,10 +34,11 @@ namespace
 		return backBuffer0 ? backBuffer0 : originalSource;
 	}
 }
-
+export CMPatch falltrees_snow;
 class shaders
 {
 public:
+
 	shaders()
 	{
 		MixTweaks::onInitEvent() += []()
@@ -46,7 +47,7 @@ public:
 				if (ini.ReadInteger("FIXES", "FixRainDropletRefraction", 1) != 0)
 				{
 					// 0x1405C9154
-					static auto pattern = hook::pattern("33 D2 48 8B CB E8 ? ? ? ? 48 8B 0D ? ? ? ? E8");
+					auto pattern = hook::pattern("33 D2 48 8B CB E8 ? ? ? ? 48 8B 0D ? ? ? ? E8");
 					if (!pattern.empty())
 					{
 						static auto rain_droplet_hudless_prepare_hook = safetyhook::create_mid(
@@ -71,6 +72,47 @@ public:
 							});
 					}
 				}
+
+				auto pattern = hook::pattern("0F 84 ? ? ? ? 44 0F 2F C6");
+
+				if (!pattern.empty()) {
+					falltrees_snow.AddRaw<uint8_t>(pattern.get_first(0), 0xE9);
+					falltrees_snow.AddRaw<int32_t>(pattern.get_first(1), 0x931);
+					falltrees_snow.AddRaw<uint8_t>(pattern.get_first(5), 0x90);
+				}
+				if (!pattern.empty() && ini.ReadInteger("GRAPHICS","RemoveSnowFromHeights",0))
+				{
+					falltrees_snow.Apply();
+				}
+				static CMPatch cutscene_patch{};
+				cutscene_patch.Add<uint8_t>("C6 05 ? ? ? ? ? 74 ? C6 05 ? ? ? ? 00 48 8B 15", 0, 6);
+				if (ini.ReadInteger("GRAPHICS", "DisableCutsceneBars", 1))
+				{
+					cutscene_patch.Apply();
+				}
+
+				pattern = hook::pattern("0F 2F 05 ? ? ? ? 0F 82 ? ? ? ? 0F 10 57");
+
+
+
+				if (!pattern.empty())
+				{
+					auto displacement = resolve_displacement(pattern.get_first());
+					if (displacement.has_value()) {
+						auto offset = make_pattern_rip_relative_offset("F3 0F 5E 1D ? ? ? ? 74", displacement.value(), 0);
+						if (offset.has_value())
+						{
+							static CMPatch dithering_workaround;
+							pattern = hook::pattern("F3 0F 5E 1D ? ? ? ? 74");
+							if (!pattern.empty()) {
+								dithering_workaround.Add<int>((uintptr_t)pattern.get_first(4), offset.value());
+								dithering_workaround.Apply();
+							}
+						}
+					}
+
+				}
+
 		};
 	}
 }shaders;

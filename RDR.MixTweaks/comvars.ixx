@@ -37,16 +37,35 @@ static_assert(sizeof(GameString) == 0x20);
 
 export namespace rage
 {
+	namespace UIFactory
+	{
+		GAME_FN(
+			GetUIObjectByIdName_func,
+			"? ? ? ? ? ? ? ? ? ? ? ? 0F 84 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 74 ? 0F 1F 40 ? 0F 1F 84 00",
+			uintptr_t,
+			(uintptr_t instance, const char* name),
+			-0xA
+		);
+
+		uintptr_t GetUIObjectByIdName(uintptr_t instance, const char* name)
+		{
+			return GetUIObjectByIdName_func(instance, name);
+		}
+
+		uintptr_t* sm_Instance = nullptr;
+
+	}
+
 
 	GAME_FN(
 		atPartialStringHash,
 		"75 ? 33 C0 C3 ? ? ? 75 ? 0F B6 41",
-		__int64,
+		uint32_t,
 		(const char* string, int starter),
 		-6
 	);
 
-	__int64 atStringHash(const char* string, int starter = 0)
+	__declspec(noinline) uint32_t atStringHash(const char* string, int starter = 0)
 	{
 		auto result = atPartialStringHash(string, starter);
 		return 32769 * ((9 * result) ^ ((unsigned int)(9 * result) >> 11));
@@ -179,5 +198,14 @@ public:
 		pattern = hook::pattern("53 48 83 EC ? 48 8B D9 E8 ? ? ? ? 48 8B D3");
 		if (!pattern.empty())
 			game_free = (uintptr_t)pattern.get_first(-5);
+
+		pattern = hook::pattern("48 8B 0D ? ? ? ? 48 8D 15 ? ? ? ? E8 ? ? ? ? 48 85 C0 74 ? 48 8D 88 ? ? ? ? ? ? ? FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9");
+		if (!pattern.empty())
+		{
+			auto displacement = resolve_displacement(pattern.get_first());
+			if (displacement.has_value())
+				rage::UIFactory::sm_Instance = reinterpret_cast<uintptr_t*>(displacement.value());
+		}
+
 	}
 }Common;

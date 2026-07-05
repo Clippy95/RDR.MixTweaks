@@ -222,6 +222,7 @@
     </ClCompile>
     <ClCompile Include="rpf.ixx" />
     <ClCompile Include="shaders.ixx" />
+    <ClCompile Include="strtbl.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="external\ModUtils\LICENSE" />

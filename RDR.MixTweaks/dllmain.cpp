@@ -5,14 +5,34 @@
 
 import common;
 
+void OpenConsole()
+{
+    AllocConsole();
+
+    FILE* fp;
+    freopen_s(&fp, "CONOUT$", "w", stdout);
+    freopen_s(&fp, "CONOUT$", "w", stderr);
+    freopen_s(&fp, "CONIN$", "r", stdin);
+
+    SetConsoleTitleA("Debug MixTweaks Console");
+
+}
+
 void Init()
 {
+
+
+
     CIniReader ini{};
     if (ini.ReadInteger("DEBUG", "DisableCrashLog", 1) != 0)
     {
         auto pattern = hook::pattern("48 89 4C 24 ? 55 53 56 57 41 54 41 55 48 8D AC 24 ? ? ? ? 48 81 EC");
         Memory::VP::Patch(pattern.get_first(), 0xC3);
     }
+
+    if (ini.ReadInteger("DEUB", "OpenConsole", 0))
+        OpenConsole();
+
     MixTweaks::onInitEvent().executeAll();
 }
 

@@ -2,6 +2,8 @@ module;
 
 #include "common.hxx"
 #include <Zydis.h>
+#include <cstring>
+#include <limits>
 
 export module common;
 
@@ -151,6 +153,19 @@ export template<typename Ret, typename... Args>
 inline Ret thiscall_call(uintptr_t addr, Args... args)
 {
     return reinterpret_cast<Ret(__thiscall*)(Args...)>(addr)(args...);
+}
+
+export template<typename Ret, typename Obj, typename... Args>
+inline Ret vftable_call(Obj* object, ptrdiff_t vftable_offset, Args... args)
+{
+    using Fn = Ret(__fastcall*)(Obj*, Args...);
+
+    auto vftable = *reinterpret_cast<uintptr_t**>(object);
+    auto fn = reinterpret_cast<Fn>(*reinterpret_cast<uintptr_t*>(
+        reinterpret_cast<uintptr_t>(vftable) + vftable_offset
+        ));
+
+    return fn(object, args...);
 }
 
 export constexpr uintptr_t rdr_exe_base = 0x140000000;
@@ -758,6 +773,234 @@ T from_bytes(const T1& bytes)
     return object;
 }
 
+export class CMPatch
+{
+public:
+    CMPatch() = default;
+
+    CMPatch(std::initializer_list<std::function<void(CMPatch&)>> init)
+    {
+        for (auto& fn : init)
+            fn(*this);
+    }
+
+    ~CMPatch()
+    {
+        Restore();
+    }
+
+    CMPatch(const CMPatch&) = delete;
+    CMPatch& operator=(const CMPatch&) = delete;
+
+    CMPatch(CMPatch&& other) noexcept
+        : m_patches(std::move(other.m_patches))
+        , m_isApplied(other.m_isApplied)
+    {
+        other.m_isApplied = false;
+    }
+
+    CMPatch& operator=(CMPatch&& other) noexcept
+    {
+        if (this != &other)
+        {
+            Restore();
+            m_patches = std::move(other.m_patches);
+            m_isApplied = other.m_isApplied;
+            other.m_isApplied = false;
+        }
+
+        return *this;
+    }
+
+    template <typename T>
+    CMPatch& Add(uintptr_t address, const T& value)
+    {
+        return AddRaw(RdrAddress(address), value);
+    }
+
+    CMPatch& Add(uintptr_t address, std::initializer_list<uint8_t> bytes)
+    {
+        return AddRaw(RdrAddress(address), bytes);
+    }
+
+    CMPatch& Add(uintptr_t address, const void* data, size_t len)
+    {
+        return AddRaw(RdrAddress(address), data, len);
+    }
+
+    template <typename T>
+    CMPatch& Add(const char* signature, const T& value, ptrdiff_t get_first_arg = 0)
+    {
+        auto pattern = hook::pattern(signature);
+        if (!pattern.empty())
+            AddRaw(pattern.get_first(get_first_arg), value);
+
+        return *this;
+    }
+
+    CMPatch& Add(const char* signature, std::initializer_list<uint8_t> bytes, ptrdiff_t get_first_arg = 0)
+    {
+        auto pattern = hook::pattern(signature);
+        if (!pattern.empty())
+            AddRaw(pattern.get_first(get_first_arg), bytes);
+
+        return *this;
+    }
+
+    CMPatch& Add(const char* signature, const void* data, size_t len, ptrdiff_t get_first_arg = 0)
+    {
+        auto pattern = hook::pattern(signature);
+        if (!pattern.empty())
+            AddRaw(pattern.get_first(get_first_arg), data, len);
+
+        return *this;
+    }
+
+    CMPatch& AddNop(uintptr_t address, size_t size)
+    {
+        return AddNopRaw(RdrAddress(address), size);
+    }
+
+    CMPatch& AddNop(const char* signature, size_t size, ptrdiff_t get_first_arg = 0)
+    {
+        auto pattern = hook::pattern(signature);
+        if (!pattern.empty())
+            AddNopRaw(pattern.get_first(get_first_arg), size);
+
+        return *this;
+    }
+
+    template <typename T>
+    CMPatch& AddRaw(uintptr_t address, const T& value)
+    {
+        return AddRaw(reinterpret_cast<void*>(address), value);
+    }
+
+    template <typename T>
+    CMPatch& AddRaw(void* address, const T& value)
+    {
+        const auto bytes = to_bytes(value);
+        return AddRaw(address, bytes.data(), bytes.size());
+    }
+
+    CMPatch& AddRaw(uintptr_t address, std::initializer_list<uint8_t> bytes)
+    {
+        return AddRaw(reinterpret_cast<void*>(address), bytes);
+    }
+
+    CMPatch& AddRaw(void* address, std::initializer_list<uint8_t> bytes)
+    {
+        return AddPatch(address, bytes.begin(), bytes.size());
+    }
+
+    CMPatch& AddRaw(uintptr_t address, const void* data, size_t len)
+    {
+        return AddRaw(reinterpret_cast<void*>(address), data, len);
+    }
+
+    CMPatch& AddRaw(void* address, const void* data, size_t len)
+    {
+        return AddPatch(address, static_cast<const uint8_t*>(data), len);
+    }
+
+    CMPatch& AddNopRaw(uintptr_t address, size_t size)
+    {
+        return AddNopRaw(reinterpret_cast<void*>(address), size);
+    }
+
+    CMPatch& AddNopRaw(void* address, size_t size)
+    {
+        std::vector<uint8_t> bytes(size, 0x90);
+        return AddPatch(address, bytes.data(), bytes.size());
+    }
+
+    void Apply()
+    {
+        if (m_isApplied)
+            return;
+
+        for (auto& patch : m_patches)
+            WriteBytes(patch.address, patch.patchBytes);
+
+        m_isApplied = true;
+    }
+
+    void Restore()
+    {
+        if (!m_isApplied)
+            return;
+
+        for (auto& patch : m_patches)
+            WriteBytes(patch.address, patch.originalBytes);
+
+        m_isApplied = false;
+    }
+
+    void Clear()
+    {
+        Restore();
+        m_patches.clear();
+    }
+
+    bool IsApplied() const
+    {
+        return m_isApplied;
+    }
+
+    bool Empty() const
+    {
+        return m_patches.empty();
+    }
+
+    size_t Size() const
+    {
+        return m_patches.size();
+    }
+
+private:
+    struct PatchEntry
+    {
+        uintptr_t address{};
+        std::vector<uint8_t> originalBytes;
+        std::vector<uint8_t> patchBytes;
+    };
+
+    CMPatch& AddPatch(void* address, const uint8_t* data, size_t len)
+    {
+        if (!address || !data || len == 0)
+            return *this;
+
+        PatchEntry entry;
+        entry.address = reinterpret_cast<uintptr_t>(address);
+        entry.originalBytes.resize(len);
+        entry.patchBytes.assign(data, data + len);
+
+        std::memcpy(entry.originalBytes.data(), address, len);
+        m_patches.push_back(std::move(entry));
+
+        if (m_isApplied)
+            WriteBytes(m_patches.back().address, m_patches.back().patchBytes);
+
+        return *this;
+    }
+
+    static void WriteBytes(uintptr_t address, const std::vector<uint8_t>& bytes)
+    {
+        if (address == 0 || bytes.empty())
+            return;
+
+        DWORD oldProtect = 0;
+        auto* ptr = reinterpret_cast<void*>(address);
+        VirtualProtect(ptr, bytes.size(), PAGE_EXECUTE_READWRITE, &oldProtect);
+        std::memcpy(ptr, bytes.data(), bytes.size());
+        VirtualProtect(ptr, bytes.size(), oldProtect, &oldProtect);
+        FlushInstructionCache(GetCurrentProcess(), ptr, bytes.size());
+    }
+
+    std::vector<PatchEntry> m_patches;
+    bool m_isApplied = false;
+};
+
 export template <size_t n>
 std::string pattern_str(const std::array<uint8_t, n> bytes)
 {
@@ -1076,6 +1319,125 @@ export bool resolve_pattern_displacement(const char* pattern_string, uintptr_t& 
 
     value = displacement.value();
     return true;
+}
+
+export struct RipRelativeDisplacement
+{
+    uintptr_t instruction{};
+    uintptr_t target{};
+    uintptr_t displacement_address{};
+    int64_t displacement{};
+    uint8_t instruction_length{};
+    uint8_t displacement_offset{};
+    uint8_t displacement_size{};
+};
+
+export std::optional<RipRelativeDisplacement> resolve_rip_relative_displacement(auto ip)
+{
+    const uintptr_t runtime_ip = to_uintptr(ip);
+
+    ZydisDecoder decoder{};
+
+#if defined(_M_X64) || defined(__x86_64__)
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
+#else
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
+#endif
+
+    ZydisDecodedInstruction instruction{};
+    ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT]{};
+
+    const ZyanStatus status = ZydisDecoderDecodeFull(
+        &decoder,
+        reinterpret_cast<const void*>(runtime_ip),
+        ZYDIS_MAX_INSTRUCTION_LENGTH,
+        &instruction,
+        operands
+    );
+
+    if (!ZYAN_SUCCESS(status) || instruction.raw.disp.size == 0)
+        return std::nullopt;
+
+    for (uint32_t i = 0; i < instruction.operand_count_visible; ++i)
+    {
+        const auto& operand = operands[i];
+        if (operand.type != ZYDIS_OPERAND_TYPE_MEMORY)
+            continue;
+
+#if defined(_M_X64) || defined(__x86_64__)
+        if (operand.mem.base != ZYDIS_REGISTER_RIP)
+            continue;
+#else
+        if (operand.mem.base != ZYDIS_REGISTER_EIP)
+            continue;
+#endif
+
+        ZyanU64 absolute_address = 0;
+        if (!ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(
+            &instruction,
+            &operand,
+            static_cast<ZyanU64>(runtime_ip),
+            &absolute_address
+        )))
+        {
+            return std::nullopt;
+        }
+
+        return RipRelativeDisplacement{
+            runtime_ip,
+            static_cast<uintptr_t>(absolute_address),
+            runtime_ip + instruction.raw.disp.offset,
+            static_cast<int64_t>(instruction.raw.disp.value),
+            static_cast<uint8_t>(instruction.length),
+            static_cast<uint8_t>(instruction.raw.disp.offset),
+            static_cast<uint8_t>(instruction.raw.disp.size)
+        };
+    }
+
+    return std::nullopt;
+}
+
+export std::optional<int32_t> make_rip_relative_offset(auto ip, uintptr_t target)
+{
+    const auto info = resolve_rip_relative_displacement(ip);
+    if (!info.has_value() || info->displacement_size != 32)
+        return std::nullopt;
+
+    const auto next_instruction = info->instruction + info->instruction_length;
+    const auto displacement = static_cast<int64_t>(target) - static_cast<int64_t>(next_instruction);
+    if (displacement < std::numeric_limits<int32_t>::min() || displacement > std::numeric_limits<int32_t>::max())
+        return std::nullopt;
+
+    return static_cast<int32_t>(displacement);
+}
+
+export bool patch_rip_relative_target(auto ip, uintptr_t target)
+{
+    const auto info = resolve_rip_relative_displacement(ip);
+    const auto displacement = make_rip_relative_offset(ip, target);
+    if (!info.has_value() || !displacement.has_value())
+        return false;
+
+    Memory::VP::Patch<int32_t>(reinterpret_cast<void*>(info->displacement_address), displacement.value());
+    return true;
+}
+
+export std::optional<int32_t> make_pattern_rip_relative_offset(const char* pattern_string, uintptr_t target, int get_first_offset = 0)
+{
+    auto pattern = hook::pattern(pattern_string);
+    if (pattern.empty())
+        return std::nullopt;
+
+    return make_rip_relative_offset(pattern.get_first(get_first_offset), target);
+}
+
+export bool patch_pattern_rip_relative_target(const char* pattern_string, uintptr_t target, int get_first_offset = 0)
+{
+    auto pattern = hook::pattern(pattern_string);
+    if (pattern.empty())
+        return false;
+
+    return patch_rip_relative_target(pattern.get_first(get_first_offset), target);
 }
 
 //export std::optional<uintptr_t> resolve_next_displacement(auto ip)
