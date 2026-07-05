@@ -105,7 +105,7 @@ public:
 							static CMPatch dithering_workaround;
 							pattern = hook::pattern("F3 0F 5E 1D ? ? ? ? 74");
 							if (!pattern.empty()) {
-								dithering_workaround.Add<int>((uintptr_t)pattern.get_first(4), offset.value());
+								dithering_workaround.AddRaw<int>(pattern.get_first(4), offset.value());
 								dithering_workaround.Apply();
 							}
 						}
