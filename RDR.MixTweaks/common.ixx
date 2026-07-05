@@ -4,6 +4,7 @@ module;
 #include <Zydis.h>
 #include <cstring>
 #include <limits>
+#include <safetyhook.hpp>
 
 export module common;
 
@@ -402,114 +403,24 @@ export bool IsUALPresent()
 export class CallbackHandler
 {
 public:
-    static inline void RegisterCallback(std::function<void()>&& fn)
-    {
-        fn();
-    }
+    static void RegisterCallback(std::function<void()>&& fn);
+    static void RegisterCallback(std::wstring_view module_name, std::function<void()>&& fn);
+    static void RegisterModuleLoadCallback(std::wstring_view module_name, std::function<void()>&& fn);
+    static void RegisterModuleUnloadCallback(std::wstring_view module_name, std::function<void()>&& fn);
+    static void RegisterAnyModuleLoadCallback(std::function<void(HMODULE)>&& fn);
+    static void RegisterAnyModuleUnloadCallback(std::function<void(std::wstring_view module_name)>&& fn);
 
-    static inline void RegisterCallback(std::wstring_view module_name, std::function<void()>&& fn, bool bOnUnload = false)
-    {
-        if (!bOnUnload && (module_name.empty() || GetModuleHandleW(module_name.data()) != NULL))
-        {
-            fn();
-        }
-        else
-        {
-            RegisterDllNotification();
-            if (!bOnUnload)
-                GetOnModuleLoadCallbackList().emplace(module_name, std::forward<std::function<void()>>(fn));
-            else
-                GetOnModuleUnloadCallbackList().emplace(module_name, std::forward<std::function<void()>>(fn));
-        }
-    }
+    [[deprecated("Use RegisterCallbackAtGetSystemTimeAsFileTime instead.")]]
+    static void RegisterCallback(std::function<void()>&& fn, hook::pattern pattern);
 
-    static inline void RegisterCallback(std::function<void(HMODULE)>&& fn)
-    {
-        RegisterDllNotification();
-        GetOnAnyModuleLoadCallbackList().emplace_back(std::forward<std::function<void(HMODULE)>>(fn));
-    }
+    static void RegisterCallbackAtGetSystemTimeAsFileTime(std::function<void()>&& fn);
+    static void RegisterCallbackAtGetSystemTimeAsFileTime(std::function<void()>&& fn, hook::pattern pattern);
 
-    static inline void RegisterCallback(std::function<void()>&& fn, bool bPatternNotFound, ptrdiff_t offset = 0x1100, uint32_t* ptr = nullptr)
-    {
-        if (!bPatternNotFound)
-        {
-            fn();
-        }
-        else
-        {
-            auto mh = GetModuleHandle(NULL);
-            IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)((DWORD)mh + ((IMAGE_DOS_HEADER*)mh)->e_lfanew);
-            if (ptr == nullptr)
-                ptr = (uint32_t*)((DWORD)mh + ntHeader->OptionalHeader.BaseOfCode + ntHeader->OptionalHeader.SizeOfCode - offset);
-            std::thread([](std::function<void()>&& fn, uint32_t* ptr, uint32_t val)
-                {
-                    while (*ptr == val)
-                        std::this_thread::yield();
+    static std::once_flag flag;
+};
 
-                    fn();
-                }, fn, ptr, *ptr).detach();
-        }
-    }
-
-    static inline void RegisterCallback(std::function<void()>&& fn, hook::pattern pattern)
-    {
-        if (!pattern.empty())
-        {
-            fn();
-        }
-        else
-        {
-            auto* ptr = new ThreadParams{ fn, pattern };
-            CreateThreadAutoClose(0, 0, (LPTHREAD_START_ROUTINE)&ThreadProc, (LPVOID)ptr, 0, NULL);
-        }
-    }
-
-private:
-    static inline void invokeOnModuleLoad(std::wstring_view module_name)
-    {
-        if (GetOnModuleLoadCallbackList().count(module_name.data()))
-        {
-            GetOnModuleLoadCallbackList().at(module_name.data())();
-        }
-    }
-
-    static inline void invokeOnUnload(std::wstring_view module_name)
-    {
-        if (GetOnModuleUnloadCallbackList().count(module_name.data()))
-        {
-            GetOnModuleUnloadCallbackList().at(module_name.data())();
-        }
-    }
-
-    static inline void invokeOnAnyModuleLoad(HMODULE mod)
-    {
-        if (!GetOnAnyModuleLoadCallbackList().empty())
-        {
-            for (auto& f : GetOnAnyModuleLoadCallbackList())
-            {
-                f(mod);
-            }
-        }
-    }
-
-    static inline void invokeOnAnyModuleUnload(HMODULE mod)
-    {
-        if (!GetOnAnyModuleUnloadCallbackList().empty())
-        {
-            for (auto& f : GetOnAnyModuleUnloadCallbackList())
-            {
-                f(mod);
-            }
-        }
-    }
-
-    static inline void InvokeAll()
-    {
-        for (auto&& fn : GetOnModuleLoadCallbackList())
-            fn.second();
-    }
-
-private:
+namespace callback_handler_detail
+{
     struct Comparator
     {
         bool operator() (const std::wstring& s1, const std::wstring& s2) const
@@ -518,48 +429,32 @@ private:
             std::wstring str2(s2.length(), ' ');
             std::transform(s1.begin(), s1.end(), str1.begin(), tolower);
             std::transform(s2.begin(), s2.end(), str2.begin(), tolower);
-            return  str1 < str2;
+            return str1 < str2;
         }
     };
 
-    static inline std::map<std::wstring, std::function<void()>, Comparator>& GetOnModuleLoadCallbackList()
-    {
-        static std::map<std::wstring, std::function<void()>, Comparator> onModuleLoad;
-        return onModuleLoad;
-    }
-
-    static inline std::map<std::wstring, std::function<void()>, Comparator>& GetOnModuleUnloadCallbackList()
-    {
-        static std::map<std::wstring, std::function<void()>, Comparator> onModuleUnload;
-        return onModuleUnload;
-    }
-
-    static inline std::vector<std::function<void(HMODULE)>>& GetOnAnyModuleLoadCallbackList()
-    {
-        return onAnyModuleLoad;
-    }
-
-    static inline std::vector<std::function<void(HMODULE)>>& GetOnAnyModuleUnloadCallbackList()
-    {
-        return onAnyModuleUnload;
-    }
-
     struct ThreadParams
     {
+        ThreadParams(std::function<void()> fn_, std::optional<hook::pattern> pattern_) :
+            fn(std::move(fn_)),
+            pattern(std::move(pattern_))
+        {}
+
         std::function<void()> fn;
-        hook::pattern pattern;
+        std::optional<hook::pattern> pattern;
+        bool executed{};
     };
 
-    typedef NTSTATUS(NTAPI* _LdrRegisterDllNotification) (ULONG, PVOID, PVOID, PVOID);
-    typedef NTSTATUS(NTAPI* _LdrUnregisterDllNotification) (PVOID);
+    typedef NTSTATUS(NTAPI* _LdrRegisterDllNotification)(ULONG, PVOID, PVOID, PVOID);
+    typedef NTSTATUS(NTAPI* _LdrUnregisterDllNotification)(PVOID);
 
     typedef struct _LDR_DLL_LOADED_NOTIFICATION_DATA
     {
-        ULONG Flags;                    //Reserved.
-        PUNICODE_STRING FullDllName;    //The full path name of the DLL module.
-        PUNICODE_STRING BaseDllName;    //The base file name of the DLL module.
-        PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
-        ULONG SizeOfImage;              //The size of the DLL image, in bytes.
+        ULONG Flags;
+        PUNICODE_STRING FullDllName;
+        PUNICODE_STRING BaseDllName;
+        PVOID DllBase;
+        ULONG SizeOfImage;
     } LDR_DLL_LOADED_NOTIFICATION_DATA, LDR_DLL_UNLOADED_NOTIFICATION_DATA, * PLDR_DLL_LOADED_NOTIFICATION_DATA, * PLDR_DLL_UNLOADED_NOTIFICATION_DATA;
 
     typedef union _LDR_DLL_NOTIFICATION_DATA
@@ -568,37 +463,76 @@ private:
         LDR_DLL_UNLOADED_NOTIFICATION_DATA Unloaded;
     } LDR_DLL_NOTIFICATION_DATA, * PLDR_DLL_NOTIFICATION_DATA;
 
-    typedef NTSTATUS(NTAPI* PLDR_MANIFEST_PROBER_ROUTINE)
-        (
-            IN HMODULE DllBase,
-            IN PCWSTR FullDllPath,
-            OUT PHANDLE ActivationContext
-            );
+    typedef NTSTATUS(NTAPI* PLDR_MANIFEST_PROBER_ROUTINE)(IN HMODULE DllBase, IN PCWSTR FullDllPath, OUT PHANDLE ActivationContext);
+    typedef NTSTATUS(NTAPI* PLDR_ACTX_LANGUAGE_ROURINE)(IN HANDLE Unk, IN USHORT LangID, OUT PHANDLE ActivationContext);
+    typedef void(NTAPI* PLDR_RELEASE_ACT_ROUTINE)(IN HANDLE ActivationContext);
+    typedef VOID(NTAPI* fnLdrSetDllManifestProber)(IN PLDR_MANIFEST_PROBER_ROUTINE ManifestProberRoutine, IN PLDR_ACTX_LANGUAGE_ROURINE CreateActCtxLanguageRoutine, IN PLDR_RELEASE_ACT_ROUTINE ReleaseActCtxRoutine);
 
-    typedef NTSTATUS(NTAPI* PLDR_ACTX_LANGUAGE_ROURINE)
-        (
-            IN HANDLE Unk,
-            IN USHORT LangID,
-            OUT PHANDLE ActivationContext
-            );
+    auto& GetOnModuleLoadCallbackList()
+    {
+        static std::map<std::wstring, std::function<void()>, Comparator> onModuleLoad;
+        return onModuleLoad;
+    }
 
-    typedef void(NTAPI* PLDR_RELEASE_ACT_ROUTINE)
-        (
-            IN HANDLE ActivationContext
-            );
+    auto& GetOnModuleUnloadCallbackList()
+    {
+        static std::map<std::wstring, std::function<void()>, Comparator> onModuleUnload;
+        return onModuleUnload;
+    }
 
-    typedef VOID(NTAPI* fnLdrSetDllManifestProber)
-        (
-            IN PLDR_MANIFEST_PROBER_ROUTINE ManifestProberRoutine,
-            IN PLDR_ACTX_LANGUAGE_ROURINE CreateActCtxLanguageRoutine,
-            IN PLDR_RELEASE_ACT_ROUTINE ReleaseActCtxRoutine
-            );
+    auto& GetOnAnyModuleLoadCallbackList()
+    {
+        static std::vector<std::function<void(HMODULE)>> onAnyModuleLoad;
+        return onAnyModuleLoad;
+    }
 
-private:
-    static inline void CALLBACK LdrDllNotification(ULONG NotificationReason, PLDR_DLL_NOTIFICATION_DATA NotificationData, PVOID Context)
+    auto& GetOnAnyModuleUnloadCallbackList()
+    {
+        static std::vector<std::function<void(std::wstring_view)>> onAnyModuleUnload;
+        return onAnyModuleUnload;
+    }
+
+    auto& GetCallbackParamsList()
+    {
+        static std::vector<ThreadParams> callbackParams;
+        return callbackParams;
+    }
+
+    SafetyHookInline shGetSystemTimeAsFileTime = {};
+    _LdrRegisterDllNotification LdrRegisterDllNotification = nullptr;
+    _LdrUnregisterDllNotification LdrUnregisterDllNotification = nullptr;
+    void* cookie = nullptr;
+    fnLdrSetDllManifestProber LdrSetDllManifestProber = nullptr;
+
+    void invokeOnModuleLoad(std::wstring_view module_name)
+    {
+        if (GetOnModuleLoadCallbackList().count(module_name.data()))
+            GetOnModuleLoadCallbackList().at(module_name.data())();
+    }
+
+    void invokeOnUnload(std::wstring_view module_name)
+    {
+        if (GetOnModuleUnloadCallbackList().count(module_name.data()))
+            GetOnModuleUnloadCallbackList().at(module_name.data())();
+    }
+
+    void invokeOnAnyModuleLoad(HMODULE mod)
+    {
+        for (auto& f : GetOnAnyModuleLoadCallbackList())
+            f(mod);
+    }
+
+    void invokeOnAnyModuleUnload(std::wstring_view module_name)
+    {
+        for (auto& f : GetOnAnyModuleUnloadCallbackList())
+            f(module_name);
+    }
+
+    void CALLBACK LdrDllNotification(ULONG NotificationReason, PLDR_DLL_NOTIFICATION_DATA NotificationData, PVOID Context)
     {
         static constexpr auto LDR_DLL_NOTIFICATION_REASON_LOADED = 1;
         static constexpr auto LDR_DLL_NOTIFICATION_REASON_UNLOADED = 2;
+
         if (NotificationReason == LDR_DLL_NOTIFICATION_REASON_LOADED)
         {
             invokeOnModuleLoad(NotificationData->Loaded.BaseDllName->Buffer);
@@ -607,83 +541,95 @@ private:
         else if (NotificationReason == LDR_DLL_NOTIFICATION_REASON_UNLOADED)
         {
             invokeOnUnload(NotificationData->Loaded.BaseDllName->Buffer);
-            invokeOnAnyModuleUnload((HMODULE)NotificationData->Loaded.DllBase);
+            invokeOnAnyModuleUnload(NotificationData->Loaded.BaseDllName->Buffer);
         }
     }
 
-    static inline NTSTATUS NTAPI ProbeCallback(IN HMODULE DllBase, IN PCWSTR FullDllPath, OUT PHANDLE ActivationContext)
+    NTSTATUS NTAPI ProbeCallback(IN HMODULE DllBase, IN PCWSTR FullDllPath, OUT PHANDLE ActivationContext)
     {
-        //wprintf(L"ProbeCallback: Base %p, path '%ls', context %p\r\n", DllBase, FullDllPath, *ActivationContext);
-
         std::wstring str(FullDllPath);
         invokeOnModuleLoad(str.substr(str.find_last_of(L"/\\") + 1));
         invokeOnAnyModuleLoad(DllBase);
 
-        //if (!*ActivationContext)
-        //    return STATUS_INVALID_PARAMETER; // breaks on xp
-
-        HANDLE actx = NULL;
         ACTCTXW act = { 0 };
-
         act.cbSize = sizeof(act);
         act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_HMODULE_VALID;
         act.lpSource = FullDllPath;
         act.hModule = DllBase;
         act.lpResourceName = ISOLATIONAWARE_MANIFEST_RESOURCE_ID;
 
-        // Reset pointer, crucial for x64 version
         *ActivationContext = 0;
 
-        actx = CreateActCtxW(&act);
-
-        // Report no manifest is present
+        HANDLE actx = CreateActCtxW(&act);
         if (actx == INVALID_HANDLE_VALUE)
-            return 0xC000008B; //STATUS_RESOURCE_NAME_NOT_FOUND;
+            return 0xC000008B;
 
         *ActivationContext = actx;
-
         return STATUS_SUCCESS;
     }
 
-    static inline void RegisterDllNotification()
+    void RegisterDllNotification()
     {
         LdrRegisterDllNotification = (_LdrRegisterDllNotification)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrRegisterDllNotification");
         if (LdrRegisterDllNotification)
         {
             if (!cookie)
                 LdrRegisterDllNotification(0, LdrDllNotification, 0, &cookie);
+            return;
         }
-        else
-        {
-            LdrSetDllManifestProber = (fnLdrSetDllManifestProber)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrSetDllManifestProber");
-            if (LdrSetDllManifestProber)
-            {
-                LdrSetDllManifestProber(&ProbeCallback, NULL, &ReleaseActCtx);
-            }
-        }
+
+        LdrSetDllManifestProber = (fnLdrSetDllManifestProber)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrSetDllManifestProber");
+        if (LdrSetDllManifestProber)
+            LdrSetDllManifestProber(&ProbeCallback, NULL, &ReleaseActCtx);
     }
 
-    static inline void UnRegisterDllNotification()
+    void UnRegisterDllNotification()
     {
         LdrUnregisterDllNotification = (_LdrUnregisterDllNotification)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "LdrUnregisterDllNotification");
         if (LdrUnregisterDllNotification && cookie)
             LdrUnregisterDllNotification(cookie);
     }
 
-private:
-    static inline DWORD WINAPI ThreadProc(LPVOID ptr)
+    void WINAPI GetSystemTimeAsFileTimeHook(LPFILETIME lpSystemTimeAsFileTime)
     {
-        auto paramsPtr = static_cast<CallbackHandler::ThreadParams*>(ptr);
+        bool allExecuted = false;
+
+        {
+            auto& threadParams = GetCallbackParamsList();
+
+            static std::mutex threadParamsMutex;
+            std::lock_guard<std::mutex> lock(threadParamsMutex);
+
+            for (auto& it : threadParams)
+            {
+                if (!it.executed && (!it.pattern.has_value() || !it.pattern.value().clear().empty()))
+                {
+                    it.executed = true;
+                    it.fn();
+                }
+            }
+
+            allExecuted = std::all_of(threadParams.begin(), threadParams.end(), [](const auto& params) { return params.executed; });
+        }
+
+        shGetSystemTimeAsFileTime.stdcall<void>(lpSystemTimeAsFileTime);
+
+        if (allExecuted)
+            shGetSystemTimeAsFileTime = {};
+    }
+
+    DWORD WINAPI ThreadProc(LPVOID ptr)
+    {
+        auto paramsPtr = (ThreadParams*)ptr;
         auto params = *paramsPtr;
         delete paramsPtr;
 
-        HANDLE hTimer = NULL;
         LARGE_INTEGER liDueTime;
         liDueTime.QuadPart = -30 * 10000000LL;
-        hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
+        HANDLE hTimer = CreateWaitableTimer(NULL, TRUE, NULL);
         SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, 0);
 
-        while (params.pattern.clear().empty())
+        while (params.pattern.value().clear().empty())
         {
             Sleep(0);
 
@@ -692,22 +638,88 @@ private:
                 CloseHandle(hTimer);
                 return 0;
             }
-        };
+        }
 
+        CloseHandle(hTimer);
         params.fn();
 
         return 0;
     }
-private:
-    static inline _LdrRegisterDllNotification   LdrRegisterDllNotification;
-    static inline _LdrUnregisterDllNotification LdrUnregisterDllNotification;
-    static inline void* cookie;
-    static inline fnLdrSetDllManifestProber     LdrSetDllManifestProber;
-public:
-    static inline std::once_flag flag;
-    static inline std::vector<std::function<void(HMODULE)>> onAnyModuleLoad;
-    static inline std::vector<std::function<void(HMODULE)>> onAnyModuleUnload;
-};
+}
+
+std::once_flag CallbackHandler::flag;
+
+void CallbackHandler::RegisterCallback(std::function<void()>&& fn)
+{
+    fn();
+}
+
+void CallbackHandler::RegisterCallback(std::wstring_view module_name, std::function<void()>&& fn)
+{
+    RegisterModuleLoadCallback(module_name, std::move(fn));
+}
+
+void CallbackHandler::RegisterModuleLoadCallback(std::wstring_view module_name, std::function<void()>&& fn)
+{
+    if (module_name.empty() || GetModuleHandleW(module_name.data()) != NULL)
+    {
+        fn();
+        return;
+    }
+
+    callback_handler_detail::RegisterDllNotification();
+    callback_handler_detail::GetOnModuleLoadCallbackList().emplace(module_name, std::move(fn));
+}
+
+void CallbackHandler::RegisterModuleUnloadCallback(std::wstring_view module_name, std::function<void()>&& fn)
+{
+    callback_handler_detail::RegisterDllNotification();
+    callback_handler_detail::GetOnModuleUnloadCallbackList().emplace(module_name, std::move(fn));
+}
+
+void CallbackHandler::RegisterAnyModuleLoadCallback(std::function<void(HMODULE)>&& fn)
+{
+    callback_handler_detail::RegisterDllNotification();
+    callback_handler_detail::GetOnAnyModuleLoadCallbackList().emplace_back(std::move(fn));
+}
+
+void CallbackHandler::RegisterAnyModuleUnloadCallback(std::function<void(std::wstring_view module_name)>&& fn)
+{
+    callback_handler_detail::RegisterDllNotification();
+    callback_handler_detail::GetOnAnyModuleUnloadCallbackList().emplace_back(std::move(fn));
+}
+
+void CallbackHandler::RegisterCallback(std::function<void()>&& fn, hook::pattern pattern)
+{
+    if (!pattern.empty())
+    {
+        fn();
+        return;
+    }
+
+    auto* ptr = new callback_handler_detail::ThreadParams(std::move(fn), pattern);
+    CloseHandle(CreateThread(0, 0, (LPTHREAD_START_ROUTINE)&callback_handler_detail::ThreadProc, (LPVOID)ptr, 0, NULL));
+}
+
+void CallbackHandler::RegisterCallbackAtGetSystemTimeAsFileTime(std::function<void()>&& fn)
+{
+    callback_handler_detail::GetCallbackParamsList().emplace_back(std::move(fn), std::nullopt);
+    if (!callback_handler_detail::shGetSystemTimeAsFileTime)
+        callback_handler_detail::shGetSystemTimeAsFileTime = safetyhook::create_inline(GetSystemTimeAsFileTime, callback_handler_detail::GetSystemTimeAsFileTimeHook);
+}
+
+void CallbackHandler::RegisterCallbackAtGetSystemTimeAsFileTime(std::function<void()>&& fn, hook::pattern pattern)
+{
+    if (!pattern.empty())
+    {
+        fn();
+        return;
+    }
+
+    callback_handler_detail::GetCallbackParamsList().emplace_back(std::move(fn), pattern);
+    if (!callback_handler_detail::shGetSystemTimeAsFileTime)
+        callback_handler_detail::shGetSystemTimeAsFileTime = safetyhook::create_inline(GetSystemTimeAsFileTime, callback_handler_detail::GetSystemTimeAsFileTimeHook);
+}
 
 export template <size_t count = 1, typename... Args>
 hook::pattern find_pattern(Args... args)
