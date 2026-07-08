@@ -213,6 +213,7 @@
     <ClCompile Include="external\ModUtils\Patterns.cpp" />
     <ClCompile Include="external\safetyhook\safetyhook.cpp" />
     <ClCompile Include="external\safetyhook\Zydis.c" />
+    <ClCompile Include="fixes.ixx" />
     <ClCompile Include="mousefix.ixx" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

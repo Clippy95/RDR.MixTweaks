@@ -14,6 +14,8 @@ class rdrPostFX;
 
 uintptr_t game_free = NULL;
 
+export float* rdr_frametime = nullptr;
+
 export class GameString
 {
 public:
@@ -205,6 +207,14 @@ public:
 			auto displacement = resolve_displacement(pattern.get_first());
 			if (displacement.has_value())
 				rage::UIFactory::sm_Instance = reinterpret_cast<uintptr_t*>(displacement.value());
+		}
+
+		pattern = hook::pattern("F3 0F 59 3D ? ? ? ? F3 0F 5C C7 0F 2F C8");
+		if (!pattern.empty())
+		{
+			auto displacement = resolve_displacement(pattern.get_first());
+			if (displacement.has_value())
+				rdr_frametime = reinterpret_cast<float*>(displacement.value());
 		}
 
 	}

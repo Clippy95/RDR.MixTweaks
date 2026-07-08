@@ -116,6 +116,9 @@
     <ClCompile Include="strtbl.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fixes.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="external\ModUtils\LICENSE">
