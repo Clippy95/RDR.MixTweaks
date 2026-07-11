@@ -67,10 +67,99 @@ export namespace rage
 		-6
 	);
 
+	GAME_FN(
+		GetAllocator_fn,
+		"48 83 EC ? 65 48 8B 04 25 ? ? ? ? BB ? ? ? ? ? ? ? ? ? ? 00 75",
+		uintptr_t,
+		(),
+		-6
+	);
+
+	GAME_FN(
+		CutsceneManagerIsCutscenePlaying_fn,
+		"80 BA ? ? ? ? 00 74 ? 44 8B 82",
+		int*,
+		(int64_t**),
+		-7
+	);
+
+	uint32_t joaat(const char* str)
+	{
+		uint32_t hash = 0;
+
+		while (*str)
+		{
+			char c = *str++;
+
+			if (c >= 'A' && c <= 'Z')
+				c += 32;
+
+			hash += static_cast<uint8_t>(c);
+			hash += hash << 10;
+			hash ^= hash >> 6;
+		}
+
+		hash += hash << 3;
+		hash ^= hash >> 11;
+		hash += hash << 15;
+
+		return hash;
+	}
+
 	__declspec(noinline) uint32_t atStringHash(const char* string, int starter = 0)
 	{
-		auto result = atPartialStringHash(string, starter);
-		return 32769 * ((9 * result) ^ ((unsigned int)(9 * result) >> 11));
+		if (atPartialStringHash) {
+			auto result = atPartialStringHash(string, starter);
+			return 32769 * ((9 * result) ^ ((unsigned int)(9 * result) >> 11));
+		}
+		return joaat(string);
+	}
+
+	uint64_t** rdr2CutSceneManager;
+	bool CutsceneManagerIsCutscenePlaying()
+	{
+		if (!CutsceneManagerIsCutscenePlaying_fn || !rdr2CutSceneManager || !*rdr2CutSceneManager)
+			return false;
+		int64_t value = 0;
+		int64_t* another_one = &value;
+		CutsceneManagerIsCutscenePlaying_fn(&another_one);
+		return (bool)value;
+	}
+
+	namespace sysMemAllocator
+	{
+		using GetAllocatorFn = uintptr_t(__fastcall*)();
+		using AllocFn = void* (__fastcall*)(uintptr_t allocator, size_t size, size_t alignment, uint32_t flags);
+		using FreeFn = void(__fastcall*)(uintptr_t allocator, void* memory);
+
+		inline uintptr_t Get()
+		{
+			return GetAllocator_fn();
+		}
+
+		inline void* Alloc(size_t size, size_t alignment = 16, uint32_t flags = 0)
+		{
+			const auto allocator = Get();
+			if (!allocator)
+				return nullptr;
+
+			const auto vtbl = *reinterpret_cast<uintptr_t*>(allocator);
+			const auto alloc = reinterpret_cast<AllocFn>(*reinterpret_cast<uintptr_t*>(vtbl + 0x10));
+			return alloc(allocator, size, alignment, flags);
+		}
+
+		//inline void Free(void* memory)
+		//{
+		//	if (!memory)
+		//		return;
+
+		//	const auto allocator = Get();
+		//	if (!allocator)
+		//		return;
+
+		//	const auto free = reinterpret_cast<FreeFn>(Memory::DynBaseAddress(0x140EB9EE0));
+		//	free(allocator, memory);
+		//}
 	}
 
 	typedef uintptr_t grcTexture;
@@ -215,6 +304,14 @@ public:
 			auto displacement = resolve_displacement(pattern.get_first());
 			if (displacement.has_value())
 				rdr_frametime = reinterpret_cast<float*>(displacement.value());
+		}
+
+		pattern = hook::pattern("4C 8B 0D ? ? ? ? 41 0F B7 91 ? ? ? ? 44 3B C2 7D ? 49 8B 81 ? ? ? ? 41 8B D0");
+		if (!pattern.empty())
+		{
+			auto displacement = resolve_displacement(pattern.get_first());
+			if (displacement.has_value())
+				rage::rdr2CutSceneManager = reinterpret_cast<uintptr_t**>(displacement.value());
 		}
 
 	}

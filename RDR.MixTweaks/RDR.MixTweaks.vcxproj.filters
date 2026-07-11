@@ -119,6 +119,9 @@
     <ClCompile Include="fixes.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="settings.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="external\ModUtils\LICENSE">

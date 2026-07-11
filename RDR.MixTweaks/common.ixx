@@ -1013,6 +1013,28 @@ private:
     bool m_isApplied = false;
 };
 
+export namespace hooks
+{
+    SafetyHookMid pattern_mid(const char* pattern_str, safetyhook::MidHookFn fn, int bytes = 0)
+    {
+        auto pattern = hook::pattern(pattern_str);
+        if (!pattern.empty())
+        {
+            return safetyhook::create_mid((void*)pattern.get_first(bytes), fn);
+        }
+    }
+    template <typename F>
+    SafetyHookInline pattern_inline(const char* pattern_str, F fn, int bytes = 0)
+    {
+        auto pattern = hook::pattern(pattern_str);
+        if (!pattern.empty())
+        {
+            return safetyhook::create_inline((void*)pattern.get_first(bytes), reinterpret_cast<void*>(fn));
+        }
+    }
+
+}
+
 export template <size_t n>
 std::string pattern_str(const std::array<uint8_t, n> bytes)
 {

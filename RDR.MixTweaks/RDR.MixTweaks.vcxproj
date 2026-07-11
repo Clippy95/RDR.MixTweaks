@@ -222,6 +222,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="rpf.ixx" />
+    <ClCompile Include="settings.ixx" />
     <ClCompile Include="shaders.ixx" />
     <ClCompile Include="strtbl.ixx" />
   </ItemGroup>
